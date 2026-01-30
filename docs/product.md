@@ -19,7 +19,7 @@ This is not a passive productivity tool. It is an **acting assistant**.
 ---
 
 CORE USER FLOW:
-1. User clicks a microphone button to start a session.
+1. User clicks a microphone button or sends a prompt through a text box to start a session.
 2. User speaks freely (voice ends via 5-second silence detection) or types.
 3. Audio is transcribed.
 4. The AI responds with:
