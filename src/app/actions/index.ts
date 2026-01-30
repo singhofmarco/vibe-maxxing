@@ -5,6 +5,7 @@ import { extractActionItems } from "@/lib/action-extraction";
 import { randomUUID } from "crypto";
 import type { ConversationMessage } from "@/lib/conversation";
 import { ASSISTANT_SYSTEM_PROMPT } from "@/lib/conversation";
+import type { ConversationStructuredOutput } from "@/lib/dashboard-types";
 import { transcribeAudio, synthesizeSpeech } from "@/lib/elevenlabs";
 import { VOICE_RECORDING_FORM_KEY } from "@/lib/voice";
 
@@ -42,6 +43,39 @@ export async function extractActionsFromInput(rawInput: string): Promise<{
     return { success: true, actions };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
+    return { success: false, error: message };
+  }
+}
+
+/** Shape of actions array in ConversationStructuredOutput (dashboard). */
+type ConversationAction = NonNullable<ConversationStructuredOutput["actions"]>[number];
+
+/**
+ * Extract action items from full conversation text (voice fallback).
+ * Use when the assistant reply did not include a JSON block; runs extraction on the conversation.
+ */
+export async function extractActionsFromConversation(
+  messages: ConversationMessage[]
+): Promise<{
+  success: boolean;
+  actions?: ConversationAction[];
+  error?: string;
+}> {
+  try {
+    if (messages.length === 0) return { success: true, actions: [] };
+    const text = messages
+      .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+      .join("\n\n");
+    const extracted = await extractActionItems(text);
+    const actions: ConversationAction[] = extracted.map((item) => ({
+      type: item.type as ConversationAction["type"],
+      title: item.title,
+      description: item.description,
+      status: "pending" as const,
+    }));
+    return { success: true, actions };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Extraction failed";
     return { success: false, error: message };
   }
 }

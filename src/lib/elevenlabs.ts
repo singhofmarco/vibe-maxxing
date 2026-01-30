@@ -54,8 +54,8 @@ export async function transcribeAudio(
 
   const blob =
     file instanceof Buffer
-      ? new Blob([file], { type: "audio/webm" })
-      : file;
+      ? new Blob([new Uint8Array(file)], { type: "audio/webm" })
+      : (file as Blob);
   const name =
     file instanceof File ? file.name : "recording.webm";
   formData.append("file", blob, name);

@@ -2,7 +2,7 @@
 
 import { Calendar, Mail, CheckSquare, ChevronRight, Inbox } from "lucide-react";
 import { useEffect, useState } from "react";
-import { collection, query, where, orderBy, limit, getDocs, Timestamp } from "firebase/firestore";
+import { collection, query, where, orderBy, limit, onSnapshot, Timestamp } from "firebase/firestore";
 import { getFirebaseFirestore } from "@/lib/firebase";
 import { useAuth } from "@/context/auth-context";
 import type { Action, ActionType, ActionStatus } from "@/lib/types";
@@ -62,46 +62,44 @@ export function ActionLog() {
   const [actions, setActions] = useState<Action[]>([]);
 
   useEffect(() => {
-    async function fetchActions() {
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
-      const db = getFirebaseFirestore();
-      if (!db) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const actionsRef = collection(db, "actions");
-        const q = query(
-          actionsRef,
-          where("userId", "==", user.uid),
-          orderBy("timestamp", "desc"),
-          limit(10)
-        );
-
-        const snapshot = await getDocs(q);
-        const fetchedActions: Action[] = [];
-
-        snapshot.forEach((doc) => {
-          fetchedActions.push({
-            id: doc.id,
-            ...doc.data(),
-          } as Action);
-        });
-
-        setActions(fetchedActions);
-      } catch (error) {
-        console.error("Error fetching actions:", error);
-      } finally {
-        setLoading(false);
-      }
+    if (!user) {
+      setLoading(false);
+      return;
     }
 
-    fetchActions();
+    const db = getFirebaseFirestore();
+    if (!db) {
+      setLoading(false);
+      return;
+    }
+
+    const actionsRef = collection(db, "actions");
+    const q = query(
+      actionsRef,
+      where("userId", "==", user.uid),
+      orderBy("timestamp", "desc"),
+      limit(10)
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const fetchedActions: Action[] = [];
+        snapshot.forEach((docSnap) => {
+          fetchedActions.push({
+            id: docSnap.id,
+            ...docSnap.data(),
+          } as Action);
+        });
+        setActions(fetchedActions);
+      },
+      (error) => {
+        console.error("Error fetching actions:", error);
+      }
+    );
+    setLoading(false);
+
+    return () => unsubscribe();
   }, [user]);
 
   return (
