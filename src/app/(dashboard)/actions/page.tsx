@@ -10,10 +10,16 @@ import {
   Edit2,
   ChevronDown,
   Check,
+  Loader2,
 } from "lucide-react";
+import { collection, query, where, orderBy, getDocs, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { getFirebaseFirestore } from "@/lib/firebase";
+import { useAuth } from "@/context/auth-context";
 import { usePendingActions } from "@/app/(dashboard)/pending-actions-context";
+import type { Action as DbAction, ActionType, ActionStatus } from "@/lib/types";
 
-interface Action {
+/** UI-friendly action shape used for rendering */
+interface UIAction {
   id: string;
   type: "calendar" | "email" | "task";
   title: string;
@@ -23,60 +29,44 @@ interface Action {
   details?: string;
 }
 
-const initialActions: Action[] = [
-  {
-    id: "1",
-    type: "calendar",
-    title: "Schedule Marketing Team Sync",
-    description: "Tomorrow at 2:00 PM with marketing@company.com",
-    status: "ready",
-    canAutomate: true,
-    details: "Google Calendar event with video conferencing link",
-  },
-  {
-    id: "2",
-    type: "email",
-    title: "Send Client Follow-up Email",
-    description: "Re: Project Timeline Update to client@example.com",
-    status: "pending",
-    canAutomate: true,
-    details:
-      "Draft email ready for review. Subject: Project Timeline Update - Q1 Deliverables",
-  },
-  {
-    id: "3",
-    type: "task",
-    title: "Review Q4 Financial Reports",
-    description: "High priority - Due by end of week",
-    status: "pending",
-    canAutomate: false,
-  },
-  {
-    id: "4",
-    type: "email",
-    title: "Send Weekly Newsletter",
-    description: "To team@company.com with project updates",
-    status: "ready",
-    canAutomate: true,
-    details: "Newsletter content generated from this week's activity",
-  },
-  {
-    id: "5",
-    type: "calendar",
-    title: "Block Focus Time",
-    description: "Friday 1:00 PM - 4:00 PM",
-    status: "pending",
-    canAutomate: true,
-  },
-  {
-    id: "6",
-    type: "task",
-    title: "Prepare Board Presentation",
-    description: "Slides needed for Monday meeting",
-    status: "pending",
-    canAutomate: false,
-  },
-];
+/** Map database action type to UI type */
+function mapActionType(dbType: ActionType): "calendar" | "email" | "task" {
+  if (dbType === "calendar_event") return "calendar";
+  return dbType;
+}
+
+/** Map database status to UI status */
+function mapActionStatus(dbStatus: ActionStatus): "pending" | "ready" | "completed" {
+  switch (dbStatus) {
+    case "scheduled":
+    case "sent":
+      return "ready";
+    case "completed":
+      return "completed";
+    case "pending":
+    case "failed":
+    default:
+      return "pending";
+  }
+}
+
+/** Determine if an action can be automated based on type */
+function canAutomate(dbType: ActionType): boolean {
+  return dbType === "calendar_event" || dbType === "email";
+}
+
+/** Convert database action to UI action */
+function dbActionToUIAction(dbAction: DbAction): UIAction {
+  return {
+    id: dbAction.id,
+    type: mapActionType(dbAction.type),
+    title: dbAction.title,
+    description: dbAction.description,
+    status: mapActionStatus(dbAction.status),
+    canAutomate: canAutomate(dbAction.type),
+    details: dbAction.payload?.details as string | undefined,
+  };
+}
 
 const iconMap = {
   calendar: Calendar,
@@ -97,11 +87,54 @@ const statusColors = {
 };
 
 export default function ActionsPage() {
-  const [actions, setActions] = useState<Action[]>(initialActions);
+  const { user } = useAuth();
+  const [actions, setActions] = useState<UIAction[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "calendar" | "email" | "task">("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const { pendingActions, setPendingActions } = usePendingActions();
+
+  // Fetch actions from Firestore
+  useEffect(() => {
+    async function fetchActions() {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      const db = getFirebaseFirestore();
+      if (!db) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const actionsRef = collection(db, "actions");
+        const q = query(
+          actionsRef,
+          where("userId", "==", user.uid),
+          orderBy("timestamp", "desc")
+        );
+
+        const snapshot = await getDocs(q);
+        const fetchedActions: UIAction[] = [];
+
+        snapshot.forEach((doc) => {
+          const dbAction = { id: doc.id, ...doc.data() } as DbAction;
+          fetchedActions.push(dbActionToUIAction(dbAction));
+        });
+
+        setActions(fetchedActions);
+      } catch (error) {
+        console.error("Error fetching actions:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchActions();
+  }, [user]);
 
   // Merge actions from layout ThoughtInput (dashboard or any page)
   useEffect(() => {
@@ -113,22 +146,60 @@ export default function ActionsPage() {
   const filteredActions =
     filter === "all" ? actions : actions.filter((a) => a.type === filter);
 
-  const executeAction = (id: string) => {
+  const executeAction = async (id: string) => {
+    // Optimistically update UI
     setActions((prev) =>
       prev.map((action) =>
         action.id === id ? { ...action, status: "completed" as const } : action
       )
     );
+
+    // Update in Firestore
+    const db = getFirebaseFirestore();
+    if (db) {
+      try {
+        const actionRef = doc(db, "actions", id);
+        await updateDoc(actionRef, { status: "completed" });
+      } catch (error) {
+        console.error("Error updating action:", error);
+      }
+    }
   };
 
-  const deleteAction = (id: string) => {
+  const deleteAction = async (id: string) => {
+    // Optimistically update UI
     setActions((prev) => prev.filter((action) => action.id !== id));
+
+    // Delete from Firestore
+    const db = getFirebaseFirestore();
+    if (db) {
+      try {
+        const actionRef = doc(db, "actions", id);
+        await deleteDoc(actionRef);
+      } catch (error) {
+        console.error("Error deleting action:", error);
+      }
+    }
   };
 
   const pendingCount = actions.filter((a) => a.status !== "completed").length;
   const automateableCount = actions.filter(
     (a) => a.canAutomate && a.status !== "completed"
   ).length;
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">Actions</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Loading actions...</p>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
