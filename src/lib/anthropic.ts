@@ -6,7 +6,7 @@ import Anthropic from "@anthropic-ai/sdk";
  * Configured to use Minimax API endpoint.
  */
 export function getAnthropicClient(): Anthropic {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.MINIMAX_API_KEY;
   if (!apiKey) {
     throw new Error("ANTHROPIC_API_KEY is not set");
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Calendar,
   Mail,
@@ -11,6 +11,7 @@ import {
   ChevronDown,
   Check,
 } from "lucide-react";
+import { usePendingActions } from "@/app/(dashboard)/pending-actions-context";
 
 interface Action {
   id: string;
@@ -99,6 +100,15 @@ export default function ActionsPage() {
   const [actions, setActions] = useState<Action[]>(initialActions);
   const [filter, setFilter] = useState<"all" | "calendar" | "email" | "task">("all");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const { pendingActions, setPendingActions } = usePendingActions();
+
+  // Merge actions from layout ThoughtInput (dashboard or any page)
+  useEffect(() => {
+    if (pendingActions.length === 0) return;
+    setActions((prev) => [...pendingActions, ...prev]);
+    setPendingActions([]);
+  }, [pendingActions, setPendingActions]);
 
   const filteredActions =
     filter === "all" ? actions : actions.filter((a) => a.type === filter);
