@@ -1,12 +1,13 @@
-You are helping build a hackathon-scale web application.
+# Voice Executive Assistant
 
-PRODUCT NAME (working):
-Voice Executive Assistant
+> You are helping build a hackathon-scale web application.
 
-PRODUCT OVERVIEW:
-This is a voice-first, session-based AI executive assistant that converts messy human brain dumps into real-world actions by automating calendar events and sending emails on the user's behalf.
+## Product overview
+
+This is a **voice-first**, session-based AI executive assistant that converts messy human brain dumps into real-world actions by automating calendar events and sending emails on the user's behalf.
 
 The user speaks freely (or types). The assistant reflects understanding, asks clarifying questions, then automatically:
+
 - Creates calendar events
 - Sends follow-up emails
 - Generates and tracks tasks
@@ -14,11 +15,12 @@ The user speaks freely (or types). The assistant reflects understanding, asks cl
 
 The product emphasizes conversational AI with personality (including sassy pushback) and visible follow-through.
 
-This is not a passive productivity tool. It is an **acting assistant**.
+**This is not a passive productivity tool. It is an acting assistant.**
 
 ---
 
-CORE USER FLOW:
+## Core user flow
+
 1. User clicks a microphone button or sends a prompt through a text box to start a session.
 2. User speaks freely (voice ends via 5-second silence detection) or types.
 3. Audio is transcribed.
@@ -37,27 +39,32 @@ Sessions are short, intentional, and action-oriented.
 
 ---
 
-AUTOMATION RULES:
+## Automation rules
+
 - The user can choose between:
-  - Manual approval mode
-  - Automatic execution mode
+  - **Manual approval mode**
+  - **Automatic execution mode**
 - In automatic mode, the assistant may act without additional confirmation.
 - If confidence is low, the assistant should still act but mark items clearly.
-- Visibility is mandatory: the user must always see what was done.
+- **Visibility is mandatory:** the user must always see what was done.
 
 ---
 
-TECH STACK:
-Frontend:
+## Tech stack
+
+**Frontend**
+
 - Next.js (App Router)
 - Tailwind CSS
 
-AI / Voice:
+**AI / Voice**
+
 - Minimax (LLM for conversational reasoning)
 - ElevenLabs (text-to-speech with expressive, characterful voice)
 - Voice Activity Detection (5-second silence cutoff)
 
-Backend:
+**Backend**
+
 - Firebase Firestore (users, sessions, actions, logs)
 - Firebase Auth (optional)
 - Calendar API (e.g., Google Calendar)
@@ -65,39 +72,53 @@ Backend:
 
 ---
 
-DATA MODEL OVERVIEW:
-Users:
-- id
-- preferredTone
-- automationMode (manual | automatic)
-- createdAt
+## Data model
 
-Sessions:
-- id
-- userId
-- status (active | completed)
-- createdAt
+**Users**
 
-Messages:
-- id
-- sessionId
-- role (user | assistant)
-- content (text transcript)
-- audioUrl (optional)
-- timestamp
+| Field           | Type     |
+| --------------- | -------- |
+| id              | string   |
+| preferredTone   | string   |
+| automationMode  | manual \| automatic |
+| createdAt       | timestamp |
 
-Actions:
-- id
-- sessionId
-- type (calendar_event | email | task)
-- payload (event details, email content, etc.)
-- status (scheduled | sent | failed)
-- confidenceLevel
-- timestamp
+**Sessions**
+
+| Field     | Type     |
+| --------- | -------- |
+| id        | string   |
+| userId    | string   |
+| status    | active \| completed |
+| createdAt | timestamp |
+
+**Messages**
+
+| Field     | Type     |
+| --------- | -------- |
+| id        | string   |
+| sessionId | string   |
+| role      | user \| assistant |
+| content   | string (text transcript) |
+| audioUrl  | optional |
+| timestamp | timestamp |
+
+**Actions**
+
+| Field           | Type     |
+| --------------- | -------- |
+| id              | string   |
+| sessionId       | string   |
+| type            | calendar_event \| email \| task |
+| payload         | event details, email content, etc. |
+| status          | scheduled \| sent \| failed |
+| confidenceLevel | number   |
+| timestamp       | timestamp |
 
 ---
 
-AI BEHAVIOR SUMMARY:
+## AI behavior
+
 - Voice-first and conversational
 - Always reflects understanding before acting
 - Asks a maximum of 2 clarifying questions per session
@@ -108,7 +129,8 @@ AI BEHAVIOR SUMMARY:
 
 ---
 
-UI REQUIREMENTS:
+## UI requirements
+
 - Large central microphone button
 - Transcript view of the session
 - Assistant response area (text + voice playback)
@@ -120,11 +142,12 @@ UI REQUIREMENTS:
   - Tasks generated
   - Daily agenda
 
-The UI should feel calm, confident, and executive—not cluttered.
+The UI should feel **calm, confident, and executive**—not cluttered.
 
 ---
 
-IMPLEMENTATION GUIDELINES:
+## Implementation guidelines
+
 - Favor simple, reliable automation over complex logic.
 - All automated actions must be logged.
 - Assume hackathon timelines—avoid overengineering.
@@ -133,7 +156,8 @@ IMPLEMENTATION GUIDELINES:
 
 ---
 
-NON-GOALS:
+## Non-goals
+
 - No background listening
 - No unlimited clarifying loops
 - No long-term memory beyond sessions
@@ -141,19 +165,24 @@ NON-GOALS:
 
 ---
 
-PRIMARY DEMO GOAL:
+## Primary demo goal
+
 Demonstrate a messy, emotional, or rambling voice dump being transformed into:
+
 - Clear understanding
 - Confident, sassy pushback
 - Real calendar events created
 - Real emails sent
 - A clean daily agenda
 
-This transformation should be visible within 30–60 seconds.
+**This transformation should be visible within 30–60 seconds.**
 
 ---
 
+## Code generation
+
 When generating code:
+
 - Always align with this product definition.
 - Do not introduce features outside this scope.
 - Optimize for clarity, reliability, and demo impact.
