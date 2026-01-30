@@ -18,11 +18,14 @@ export const metadata: Metadata = {
   description: "A personal assistant that turns your thoughts into actionable items.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
+  params,
 }: Readonly<{
   children: React.ReactNode;
+  params: Promise<Record<string, string | string[]>>;
 }>) {
+  await params; // Next.js 15+: params is a Promise, must unwrap to avoid sync access
   return (
     <html lang="en" className="dark">
       <body

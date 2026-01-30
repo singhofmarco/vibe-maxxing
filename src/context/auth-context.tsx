@@ -3,8 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import {
   GoogleAuthProvider,
-  signInWithRedirect,
-  getRedirectResult,
+  signInWithPopup,
   signOut,
   onAuthStateChanged,
   User,
@@ -64,21 +63,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, [auth]);
 
-  useEffect(() => {
-    if (!auth) return;
-
-    getRedirectResult(auth)
-      .then(async (result) => {
-        if (result?.user) {
-          await createOrUpdateUserDoc(result.user);
-          router.push("/");
-        }
-      })
-      .catch((error) => {
-        console.error("Error getting redirect result", error);
-      });
-  }, [auth, router]);
-
   const signInWithGoogle = async () => {
     if (!auth) {
       console.error("Firebase Auth not initialized");
@@ -87,7 +71,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const provider = new GoogleAuthProvider();
     provider.addScope("https://www.googleapis.com/auth/calendar.events");
-    await signInWithRedirect(auth, provider);
+    try {
+      const result = await signInWithPopup(auth, provider);
+      await createOrUpdateUserDoc(result.user);
+      router.push("/");
+    } catch (error) {
+      console.error("Error signing in with Google", error);
+      throw error;
+    }
   };
 
   const logout = async () => {
