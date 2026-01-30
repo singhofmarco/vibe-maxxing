@@ -3,28 +3,30 @@
 import { getAnthropicClient } from "@/lib/anthropic";
 import { extractActionItems } from "@/lib/action-extraction";
 import { randomUUID } from "crypto";
+import type { ConversationMessage } from "@/lib/conversation";
+import { ASSISTANT_SYSTEM_PROMPT } from "@/lib/conversation";
+import { createChatCompletion } from "@/lib/openai";
+import type { OpenAIChatMessage } from "@/lib/openai";
+import { transcribeAudio, synthesizeSpeech } from "@/lib/elevenlabs";
+import { VOICE_RECORDING_FORM_KEY } from "@/lib/voice";
 
 /**
- * Example server action using Anthropic SDK.
- * Replace with real personal-assistant logic when implementing features.
+ * Example server action using OpenAI for conversational AI.
  */
-export async function exampleAnthropicAction(prompt: string): Promise<{
+export async function exampleOpenAIAction(prompt: string): Promise<{
   success: boolean;
   message?: string;
   error?: string;
 }> {
   try {
-    const anthropic = getAnthropicClient();
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1024,
-      messages: [{ role: "user", content: prompt }],
-    });
-    const text =
-      message.content?.[0]?.type === "text"
-        ? message.content[0].text
-        : "No text response.";
-    return { success: true, message: text };
+    const reply = await createChatCompletion(
+      [
+        { role: "system", content: "You are a helpful executive assistant. Reply briefly." },
+        { role: "user", content: prompt },
+      ],
+      { max_tokens: 512 }
+    );
+    return { success: true, message: reply || "No response." };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     return { success: false, error: message };
@@ -65,6 +67,86 @@ export async function extractActionsFromInput(rawInput: string): Promise<{
     return { success: true, actions };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Get the next assistant reply in a conversation. Pass the full message history
+ * (user + assistant turns); OpenAI is used for conversational reasoning.
+ */
+export async function getAssistantReply(
+  messages: ConversationMessage[]
+): Promise<{ success: boolean; reply?: string; error?: string }> {
+  try {
+    if (messages.length === 0) {
+      return { success: false, error: "No messages" };
+    }
+    const apiMessages: OpenAIChatMessage[] = [
+      { role: "system", content: ASSISTANT_SYSTEM_PROMPT },
+      ...messages.map((m) => ({
+        role: m.role === "user" ? ("user" as const) : ("assistant" as const),
+        content: m.content,
+      })),
+    ];
+    const reply = await createChatCompletion(apiMessages, { max_tokens: 1024 });
+    return { success: true, reply: reply ?? "" };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Assistant error";
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Synthesize assistant reply as speech (ElevenLabs TTS). Returns base64 audio for playback.
+ */
+export async function synthesizeAssistantSpeech(text: string): Promise<{
+  success: boolean;
+  audioBase64?: string;
+  error?: string;
+}> {
+  try {
+    if (!text?.trim()) {
+      return { success: false, error: "No text to synthesize" };
+    }
+    const buffer = await synthesizeSpeech(text);
+    const base64 = Buffer.from(buffer).toString("base64");
+    return { success: true, audioBase64: base64 };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "TTS failed";
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Transcribe voice recording via ElevenLabs Speech-to-Text.
+ * Expects FormData with a single file under key VOICE_RECORDING_FORM_KEY (e.g. "audio").
+ */
+export async function transcribeVoiceRecording(formData: FormData): Promise<{
+  success: boolean;
+  transcript?: string;
+  error?: string;
+}> {
+  try {
+    const file = formData.get(VOICE_RECORDING_FORM_KEY);
+    if (!file || !(file instanceof Blob)) {
+      return { success: false, error: "No audio file in request" };
+    }
+    if (file.size === 0) {
+      return { success: false, error: "Audio file is empty" };
+    }
+
+    const result = await transcribeAudio(file, {
+      modelId: "scribe_v2",
+      tagAudioEvents: true,
+    });
+
+    return {
+      success: true,
+      transcript: result.text?.trim() ?? "",
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Transcription failed";
     return { success: false, error: message };
   }
 }

@@ -18,7 +18,7 @@ A personal assistant that turns your thoughts into actionable items.
 
 - **Front-end & back-end:** Next.js (App Router, Server Actions)
 - **Database:** Supabase (PostgreSQL)
-- **AI:** Anthropic (Claude SDK)
+- **AI:** OpenAI (conversational LLM), ElevenLabs (voice transcription)
 - **Firebase:** Boilerplate in place (auth / other services as needed)
 
 ## Getting Started
@@ -29,7 +29,7 @@ A personal assistant that turns your thoughts into actionable items.
    cp .env.example .env.local
    ```
 
-2. Fill in `.env.local` with your keys (Anthropic, Firebase, Supabase).
+2. Fill in `.env.local` with your keys (OpenAI, ElevenLabs, Firebase, Supabase).
 
 3. Run the dev server:
 
@@ -42,8 +42,8 @@ A personal assistant that turns your thoughts into actionable items.
 ## Project Structure
 
 - `src/app/` — App Router routes and layout
-- `src/app/actions/` — Server actions (e.g. `exampleAnthropicAction`)
-- `src/lib/anthropic.ts` — Anthropic client (server-only)
+- `src/app/actions/` — Server actions (e.g. `getAssistantReply`, `exampleOpenAIAction`)
+- `src/lib/openai.ts` — OpenAI chat client (server-only)
 - `src/lib/firebase.ts` — Firebase app and Auth (client-safe)
 - `src/lib/supabase/client.ts` — Supabase browser client
 - `src/lib/supabase/server.ts` — Supabase server client (with cookies)
@@ -52,6 +52,6 @@ A personal assistant that turns your thoughts into actionable items.
 
 - [Next.js App Router](https://nextjs.org/docs/app)
 - [Next.js Server Actions](https://nextjs.org/docs/app/building-your-application/data-fetching/server-actions-and-mutations)
-- [Anthropic API](https://docs.anthropic.com/)
+- [OpenAI API](https://platform.openai.com/docs)
 - [Supabase Docs](https://supabase.com/docs)
 - [Firebase for Web](https://firebase.google.com/docs/web/setup)
