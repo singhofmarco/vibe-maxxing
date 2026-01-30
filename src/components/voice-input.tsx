@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Mic, MicOff, Play, Pause, Volume2, Loader2, RotateCcw } from "lucide-react";
-import { transcribeVoiceRecording, getAssistantReply, synthesizeAssistantSpeech } from "@/app/actions";
+import { transcribeVoiceRecording, getAssistantReply, synthesizeAssistantSpeech, extractActionsFromConversation } from "@/app/actions";
 import type { ConversationMessage } from "@/lib/conversation";
 import type { ConversationStructuredOutput } from "@/lib/dashboard-types";
 import { parseStructuredOutput } from "@/lib/dashboard-types";
@@ -109,13 +109,19 @@ export function VoiceInput({ onTranscriptChange, onConversationActions }: VoiceI
       if (replyResult.success && replyResult.reply !== undefined) {
         const rawReply = replyResult.reply ?? "";
         const { replyText, output } = parseStructuredOutput(rawReply);
-        setConversation((prev) => [
-          ...prev,
+        const messagesWithReply: ConversationMessage[] = [
+          ...newMessages,
           { role: "assistant", content: replyText || rawReply },
-        ]);
+        ];
+        setConversation(messagesWithReply);
 
-        if (output) {
+        if (output?.actions?.length || output?.agendaItems?.length) {
           onConversationActions?.(output);
+        } else {
+          const fallback = await extractActionsFromConversation(messagesWithReply);
+          if (fallback.success && fallback.actions?.length) {
+            onConversationActions?.({ actions: fallback.actions });
+          }
         }
 
         const textForTTS = replyText.trim() || rawReply.trim();

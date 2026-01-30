@@ -2,7 +2,7 @@
 
 import { Clock, Video, Users, FileText, CalendarOff } from "lucide-react";
 import { useEffect, useState } from "react";
-import { collection, query, where, orderBy, getDocs, Timestamp } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, Timestamp } from "firebase/firestore";
 import { getFirebaseFirestore } from "@/lib/firebase";
 import { useAuth } from "@/context/auth-context";
 import type { AgendaItem, AgendaType } from "@/lib/types";
@@ -34,61 +34,55 @@ export function DailyAgenda() {
   });
 
   useEffect(() => {
-    async function fetchAgenda() {
-      if (!user) {
-        setLoading(false);
-        return;
-      }
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
-      const db = getFirebaseFirestore();
-      if (!db) {
-        setLoading(false);
-        return;
-      }
+    const db = getFirebaseFirestore();
+    if (!db) {
+      setLoading(false);
+      return;
+    }
 
-      try {
-        // Get start and end of today
-        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-        const startTimestamp = Timestamp.fromDate(startOfDay);
-        const endTimestamp = Timestamp.fromDate(endOfDay);
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const startTimestamp = Timestamp.fromDate(startOfDay);
+    const endTimestamp = Timestamp.fromDate(endOfDay);
 
-        const agendaRef = collection(db, "agenda");
-        const q = query(
-          agendaRef,
-          where("userId", "==", user.uid),
-          where("date", ">=", startTimestamp),
-          where("date", "<", endTimestamp),
-          orderBy("date", "asc")
-        );
+    const agendaRef = collection(db, "agenda");
+    const q = query(
+      agendaRef,
+      where("userId", "==", user.uid),
+      where("date", ">=", startTimestamp),
+      where("date", "<", endTimestamp),
+      orderBy("date", "asc")
+    );
 
-        const snapshot = await getDocs(q);
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
         const items: AgendaItem[] = [];
-
-        snapshot.forEach((doc) => {
+        snapshot.forEach((docSnap) => {
           items.push({
-            id: doc.id,
-            ...doc.data(),
+            id: docSnap.id,
+            ...docSnap.data(),
           } as AgendaItem);
         });
-
-        // Sort by time string (assuming format like "9:00 AM")
         items.sort((a, b) => {
           const timeA = parseTimeToMinutes(a.time);
           const timeB = parseTimeToMinutes(b.time);
           return timeA - timeB;
         });
-
         setAgendaItems(items);
-      } catch (error) {
+      },
+      (error) => {
         console.error("Error fetching agenda:", error);
-      } finally {
-        setLoading(false);
       }
-    }
+    );
+    setLoading(false);
 
-    fetchAgenda();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => unsubscribe();
   }, [user]);
 
   return (
