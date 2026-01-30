@@ -5,33 +5,8 @@ import { extractActionItems } from "@/lib/action-extraction";
 import { randomUUID } from "crypto";
 import type { ConversationMessage } from "@/lib/conversation";
 import { ASSISTANT_SYSTEM_PROMPT } from "@/lib/conversation";
-import { createChatCompletion } from "@/lib/openai";
-import type { OpenAIChatMessage } from "@/lib/openai";
 import { transcribeAudio, synthesizeSpeech } from "@/lib/elevenlabs";
 import { VOICE_RECORDING_FORM_KEY } from "@/lib/voice";
-
-/**
- * Example server action using OpenAI for conversational AI.
- */
-export async function exampleOpenAIAction(prompt: string): Promise<{
-  success: boolean;
-  message?: string;
-  error?: string;
-}> {
-  try {
-    const reply = await createChatCompletion(
-      [
-        { role: "system", content: "You are a helpful executive assistant. Reply briefly." },
-        { role: "user", content: prompt },
-      ],
-      { max_tokens: 512 }
-    );
-    return { success: true, message: reply || "No response." };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return { success: false, error: message };
-  }
-}
 
 /** Action shape used by the actions page (matches UI state). */
 export interface ActionItem {
@@ -73,7 +48,7 @@ export async function extractActionsFromInput(rawInput: string): Promise<{
 
 /**
  * Get the next assistant reply in a conversation. Pass the full message history
- * (user + assistant turns); OpenAI is used for conversational reasoning.
+ * (user + assistant turns). Uses Anthropic (Minimax) for conversational reasoning.
  */
 export async function getAssistantReply(
   messages: ConversationMessage[]
@@ -82,15 +57,24 @@ export async function getAssistantReply(
     if (messages.length === 0) {
       return { success: false, error: "No messages" };
     }
-    const apiMessages: OpenAIChatMessage[] = [
-      { role: "system", content: ASSISTANT_SYSTEM_PROMPT },
-      ...messages.map((m) => ({
-        role: m.role === "user" ? ("user" as const) : ("assistant" as const),
-        content: m.content,
-      })),
-    ];
-    const reply = await createChatCompletion(apiMessages, { max_tokens: 1024 });
-    return { success: true, reply: reply ?? "" };
+    const anthropic = getAnthropicClient();
+    const apiMessages = messages.map((m) => ({
+      role: m.role === "user" ? ("user" as const) : ("assistant" as const),
+      content: m.content,
+    }));
+    const response = await anthropic.messages.create({
+      model: "MiniMax-M2.1",
+      max_tokens: 1024,
+      system: ASSISTANT_SYSTEM_PROMPT,
+      messages: apiMessages,
+    });
+    let text = "";
+    for (const block of response.content ?? []) {
+      if (block.type === "text" && "text" in block) {
+        text += block.text;
+      }
+    }
+    return { success: true, reply: text.trim() || "" };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Assistant error";
     return { success: false, error: message };
@@ -147,6 +131,49 @@ export async function transcribeVoiceRecording(formData: FormData): Promise<{
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Transcription failed";
+    return { success: false, error: message };
+  }
+}
+
+/**
+ * Transcribe voice recording and extract action items from the transcript
+ * using the existing extraction logic (Anthropic/Minimax). One round-trip for voice → transcript + actions.
+ */
+export async function transcribeAndExtractActions(formData: FormData): Promise<{
+  success: boolean;
+  transcript?: string;
+  actions?: ActionItem[];
+  error?: string;
+}> {
+  try {
+    const transcribeResult = await transcribeVoiceRecording(formData);
+    if (!transcribeResult.success || transcribeResult.transcript === undefined) {
+      return {
+        success: false,
+        error: transcribeResult.error ?? "Transcription failed",
+      };
+    }
+    const transcript = transcribeResult.transcript.trim();
+    if (!transcript) {
+      return {
+        success: true,
+        transcript: "",
+        actions: [],
+      };
+    }
+    const extracted = await extractActionItems(transcript);
+    const actionList: ActionItem[] = extracted.map((item) => ({
+      id: randomUUID(),
+      type: item.type,
+      title: item.title,
+      description: item.description,
+      status: "pending" as const,
+      canAutomate: item.canAutomate,
+      details: item.details,
+    }));
+    return { success: true, transcript, actions: actionList };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Transcribe and extract failed";
     return { success: false, error: message };
   }
 }

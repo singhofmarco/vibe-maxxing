@@ -155,7 +155,7 @@ export function VoiceInput({ onTranscriptChange, onConversationActions }: VoiceI
           /insufficient balance|insufficient_quota|1008/i.test(err);
         setTranscriptError(
           isBalanceError
-            ? "Assistant API has insufficient balance or quota. Check your OpenAI account at platform.openai.com."
+            ? "Assistant API has insufficient balance or quota. Check your API key and account."
             : err
         );
       }
